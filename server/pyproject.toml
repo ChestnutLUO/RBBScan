@@ -1,0 +1,25 @@
+[project]
+name = "rbbscan-server"
+version = "0.1.0"
+description = "Collects RARE Battle Beacon passcode scans from the iPhone app and serves review + live dashboards"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "python-multipart>=0.0.9",
+    "openai>=3.29.0",
+    "pillow>=12.3.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "httpx2",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "tests"]

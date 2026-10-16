@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RBB Passcodes</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #16181d; --muted: #667085; --line: #e4e7ec;
+    --accent: #4f46e5; --good: #12805c; --good-bg: #e3f6ee; --warn: #b54708; --warn-bg: #fef0c7;
+    --bad: #c01048; --bad-bg: #fde7ef; --conf: #6941c6; --conf-bg: #efe9fd;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115; --panel: #181b21; --text: #eceef2; --muted: #98a2b3; --line: #2a2f38;
+      --accent: #8b85ff; --good: #4ade9b; --good-bg: #133326; --warn: #fbbf5a; --warn-bg: #3a2a0d;
+      --bad: #ff6b9a; --bad-bg: #3d1424; --conf: #c4b5fd; --conf-bg: #2a2142;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  header { position: sticky; top: 0; z-index: 2; background: var(--panel); border-bottom: 1px solid var(--line); padding: 14px 16px; }
+  .top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 18px; margin: 0; }
+  .count { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .count small { font-size: 16px; color: var(--muted); font-weight: 500; }
+  .bar { flex: 1 1 200px; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; min-width: 120px; }
+  .bar > div { height: 100%; background: var(--accent); width: 0; transition: width .3s; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { padding: 2px 10px; border-radius: 999px; font-size: 13px; background: var(--line); }
+  .chip.good { background: var(--good-bg); color: var(--good); }
+  .chip.warn { background: var(--warn-bg); color: var(--warn); }
+  .links { margin-left: auto; display: flex; gap: 8px; }
+  a.button, button { font: inherit; font-size: 14px; border: 1px solid var(--line); background: var(--panel); color: var(--text);
+    border-radius: 8px; padding: 6px 12px; cursor: pointer; text-decoration: none; }
+  button:hover, a.button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.danger { color: var(--bad); }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; max-width: 1100px; margin: 12px auto 0; }
+  input[type=search], select { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); }
+  input[type=search] { flex: 1 1 220px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  .empty { color: var(--muted); text-align: center; padding: 48px 0; }
+  .row { display: grid; grid-template-columns: 220px 1fr auto; gap: 14px; align-items: center; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+  .row.review { border-color: var(--warn); }
+  .row.verified { border-color: var(--good); }
+  .thumb { width: 220px; height: 70px; object-fit: contain; background: #000; border-radius: 6px; cursor: zoom-in; }
+  .code { font: 600 22px/1.2 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: 1px; word-break: break-all; }
+  .code .c { padding: 0 1px; border-radius: 3px; }
+  .code .conf { background: var(--conf-bg); color: var(--conf); }
+  .code .unc { background: var(--bad-bg); color: var(--bad); text-decoration: underline wavy; }
+  .meta { color: var(--muted); font-size: 13px; margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+  .variants { font: 13px ui-monospace, Menlo, monospace; color: var(--warn); margin-top: 4px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+  .legend { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  .groupbox { display: flex; align-items: center; gap: 8px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .aibox { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 13px; }
+  .aibox #ai-status { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .ai-tag { font-weight: 600; }
+  .ai-tag.confirmed { color: var(--good); }
+  .ai-tag.corrected, .ai-tag.mismatch, .ai-tag.unreadable { color: var(--warn); }
+  .ai-tag.error { color: var(--bad); }
+  details.removed { margin: 0 0 12px; font-size: 14px; }
+  details.removed summary { cursor: pointer; color: var(--muted); }
+  .removed-row { display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .removed-row img { width: 180px; border-radius: 4px; cursor: zoom-in; }
+  .removed-row .code { font-size: 16px; }
+  .groups { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+  .groups button { padding: 3px 10px; font-size: 13px; font-variant-numeric: tabular-nums; border-radius: 999px; }
+  .groups button.full { background: var(--good-bg); color: var(--good); border-color: transparent; }
+  .groups button.over { background: var(--bad-bg); color: var(--bad); border-color: transparent; font-weight: 700; }
+  .groups button.short { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
+  .groups button.selected { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .legend .code { font-size: 13px; }
+  dialog { border: none; padding: 0; width: 100vw; height: 100dvh; max-width: 100vw; max-height: 100dvh; margin: 0;
+    background: #000; color: #f2f4f7; }
+  dialog[open] { display: flex; flex-direction: column; }
+  dialog::backdrop { background: #000; }
+  .vbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 12px; background: #111318; }
+  .vbar button { background: #1d2028; color: #f2f4f7; border-color: #343946; min-width: 40px; }
+  .vbar button.on { background: #f2f4f7; color: #111318; }
+  .vbar button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .vbar .group { display: flex; gap: 4px; }
+  .vbar .icon { font-size: 20px; line-height: 1; padding: 4px 10px; }
+  .vbar .spacer { flex: 1; }
+  .vbar .pos { color: #98a2b3; font-size: 13px; min-width: 56px; text-align: center; }
+  .stage { position: relative; flex: 1; overflow: hidden; touch-action: none; cursor: grab; user-select: none; }
+  .stage.dragging { cursor: grabbing; }
+  .stage img { position: absolute; left: 0; top: 0; transform-origin: 0 0; max-width: none; image-rendering: auto; }
+  .stage .loading { position: absolute; inset: 0; display: grid; place-items: center; color: #98a2b3; }
+  .vfoot { padding: 10px 12px; background: #111318; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; }
+  .vfoot .code { font-size: clamp(20px, 3.4vw, 34px); }
+  .vfoot .hint { color: #98a2b3; font-size: 12px; margin-left: auto; }
+  .vfoot .variants { margin: 0; }
+  #toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg);
+    padding: 8px 16px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+  @media (max-width: 700px) {
+    .row { grid-template-columns: 1fr; }
+    .thumb { width: 100%; height: 90px; }
+    .actions { justify-content: flex-start; }
+    .links { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <h1>RBB Passcodes</h1>
+    <div class="count"><span id="unique">0</span> <small>/ <span id="target">1050</span></small></div>
+    <div class="bar"><div id="progress"></div></div>
+    <div class="chips">
+      <span class="chip good" id="verified-chip">0 verified</span>
+      <span class="chip warn" id="review-chip">0 to review</span>
+      <span class="chip" id="sightings-chip">0 scans</span>
+    </div>
+    <div class="groupbox">
+      <span id="group-current">Group –</span>
+      <button class="primary" id="next-group" title="Start the next stack of cards">Next group ▸</button>
+    </div>
+    <div class="aibox">
+      <span id="ai-status">AI check off</span>
+      <button id="ai-low" disabled>AI check low-confidence</button>
+      <button id="ai-all" disabled>AI check all</button>
+    </div>
+    <div class="links">
+      <a class="button" href="/live">Live dashboard</a>
+      <a class="button" href="/api/export.csv">Export CSV</a>
+    </div>
+  </div>
+  <div class="controls">
+    <input type="search" id="search" placeholder="Search passcode or note (O/0/Q, I/1/L and S/5 match each other)">
+    <select id="group-filter" aria-label="Group"><option value="">All groups</option></select>
+    <select id="filter">
+      <option value="">All passcodes</option>
+      <option value="review">Needs review</option>
+      <option value="unverified">Unverified</option>
+    </select>
+  </div>
+</header>
+<main>
+  <p class="legend">
+    <span class="code"><span class="c conf">O</span></span> look-alike characters (O=0=Q, I=1=L and S=5 count as the same in Ingress) ·
+    <span class="code"><span class="c unc">Q</span></span> the scanner was unsure: compare with the photo
+  </p>
+  <div class="groups" id="groups"></div>
+  <details class="removed" id="removed-box" hidden>
+    <summary id="removed-summary"></summary>
+    <div id="removed-list"></div>
+  </details>
+  <div id="list"></div>
+</main>
+<dialog id="viewer">
+  <div class="vbar">
+    <div class="group" id="viewer-tabs"></div>
+    <div class="group">
+      <button class="icon" id="rotate-left" title="Rotate left (Shift+R)">⟲</button>
+      <button class="icon" id="rotate-right" title="Rotate right (R)">⟳</button>
+    </div>
+    <div class="group">
+      <button class="icon" id="zoom-out" title="Zoom out (−)">−</button>
+      <button id="zoom-fit" title="Fit (0)">Fit</button>
+      <button class="icon" id="zoom-in" title="Zoom in (+)">+</button>
+    </div>
+    <span class="spacer"></span>
+    <div class="group">
+      <button class="icon" id="viewer-prev" title="Previous passcode (←)">‹</button>
+      <span class="pos" id="viewer-pos"></span>
+      <button class="icon" id="viewer-next" title="Next passcode (→)">›</button>
+    </div>
+    <button id="viewer-verify" title="Verify (V)"></button>
+    <button class="icon" id="viewer-close" title="Close (Esc)">✕</button>
+  </div>
+  <div class="stage" id="stage"><img id="stage-img" alt="" draggable="false"><div class="loading" id="stage-loading">Loading…</div></div>
+  <div class="vfoot">
+    <div id="viewer-code"></div>
+    <div class="variants" id="viewer-variants"></div>
+    <span class="hint">Scroll or pinch to zoom · drag to move · double-click to zoom · R rotate · ←/→ next</span>
+  </div>
+</dialog>
+<div id="toast"></div>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const CONFUSABLE = new Set(["0", "O", "Q", "1", "I", "L", "5", "S"]);
+let lastPayload = "";
+let currentList = [];
+let refreshTimer = null;
+
+function toast(message) {
+  const el = $("toast");
+  el.textContent = message;
+  el.classList.add("show");
+  setTimeout(() => el.classList.remove("show"), 1800);
+}
+
+function el(tag, props = {}, ...children) {
+  const node = document.createElement(tag);
+  Object.assign(node, props);
+  for (const child of children) node.append(child);
+  return node;
+}
+
+function codeNode(code, uncertain) {
+  const wrap = el("div", { className: "code" });
+  const unsure = new Set(uncertain || []);
+  [...code].forEach((ch, i) => {
+    const cls = unsure.has(i) ? "c unc" : CONFUSABLE.has(ch) ? "c conf" : "c";
+    wrap.append(el("span", { className: cls, textContent: ch }));
+  });
+  return wrap;
+}
+
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      // The page is served over plain HTTP on the tailnet, where the Clipboard API is unavailable.
+      const area = el("textarea", { value: text });
+      document.body.append(area);
+      area.select();
+      document.execCommand("copy");
+      area.remove();
+    }
+    toast(`Copied ${text}`);
+  } catch (error) {
+    toast(`Copy failed: ${error}`);
+  }
+}
+
+async function api(method, url, body) {
+  const response = await fetch(url, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!response.ok) {
+    let detail = response.statusText;
+    try { detail = (await response.json()).detail || detail; } catch (_) { /* non-JSON error body */ }
+    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+  }
+  return response.json();
+}
+
+function imageURL(name, rotation) {
+  return rotation ? `/images/${name}?rotate=${rotation}` : `/images/${name}`;
+}
+
+// Photo viewer: one passcode at a time, its images turned by the passcode's saved rotation,
+// with zoom and pan so the printed characters can be compared one by one.
+const VIEWS = [["label_img", "Passcode"], ["card_img", "Card"], ["frame_img", "Whole photo"]];
+const viewer = { list: [], index: 0, view: "label_img", scale: 1, fit: 1, x: 0, y: 0, pointers: new Map(), pinch: null };
+
+function current() { return viewer.list[viewer.index]; }
+
+function openViewer(p) {
+  viewer.list = currentList;
+  viewer.index = Math.max(0, currentList.findIndex((item) => item.id === p.id));
+  viewer.view = "label_img";
+  $("viewer").showModal();
+  showPasscode();
+}
+
+function showPasscode() {
+  const p = current();
+  if (!p) { $("viewer").close(); return; }
+  if (!p[viewer.view]) viewer.view = VIEWS.find(([key]) => p[key])?.[0] || "label_img";
+  $("viewer-tabs").replaceChildren(...VIEWS.filter(([key]) => p[key]).map(([key, label]) =>
+    el("button", { className: key === viewer.view ? "on" : "", textContent: label,
+                   onclick: () => { viewer.view = key; showPasscode(); } })));
+  $("viewer-pos").textContent = `${viewer.index + 1} / ${viewer.list.length}`;
+  $("viewer-prev").disabled = viewer.index === 0;
+  $("viewer-next").disabled = viewer.index >= viewer.list.length - 1;
+  const verify = $("viewer-verify");
+  verify.textContent = p.verified ? "✓ Verified" : "Verify ✓";
+  verify.className = p.verified ? "on" : "primary";
+  $("viewer-code").replaceChildren(codeNode(p.display_code, p.uncertain_positions));
+  $("viewer-variants").textContent = p.variants.length > 1 ? "readings: " + p.variants.map((v) => `${v.code} ×${v.count}`).join(" · ") : "";
+  loadImage();
+}
+
+function loadImage() {
+  const p = current();
+  const name = p[viewer.view];
+  const img = $("stage-img");
+  const src = name ? imageURL(name, p.rotation) : "";
+  if (img.getAttribute("src") === src && img.complete) { fitImage(); return; }
+  $("stage-loading").hidden = false;
+  img.style.visibility = "hidden";
+  img.onload = () => { $("stage-loading").hidden = true; img.style.visibility = "visible"; fitImage(); };
+  img.onerror = () => { $("stage-loading").textContent = "Image not available"; };
+  img.src = src;
+}
+
+function applyTransform() {
+  $("stage-img").style.transform = `translate(${viewer.x}px, ${viewer.y}px) scale(${viewer.scale})`;
+}
+
+function fitImage() {
+  const img = $("stage-img");
+  const stage = $("stage").getBoundingClientRect();
+  if (!img.naturalWidth || !stage.width) return;
+  viewer.fit = Math.min(stage.width / img.naturalWidth, stage.height / img.naturalHeight);
+  viewer.scale = viewer.fit;
+  viewer.x = (stage.width - img.naturalWidth * viewer.scale) / 2;
+  viewer.y = (stage.height - img.naturalHeight * viewer.scale) / 2;
+  applyTransform();
+}
+
+/** Zooms by `factor` keeping the stage point (px, py) fixed under the cursor or fingers. */
+function zoomAt(factor, px, py) {
+  const scale = Math.min(Math.max(viewer.scale * factor, viewer.fit * 0.5), Math.max(viewer.fit * 16, 4));
+  viewer.x = px - (px - viewer.x) * (scale / viewer.scale);
+  viewer.y = py - (py - viewer.y) * (scale / viewer.scale);
+  viewer.scale = scale;
+  applyTransform();
+}
+
+function zoomCentre(factor) {
+  const stage = $("stage").getBoundingClientRect();
+  zoomAt(factor, stage.width / 2, stage.height / 2);
+}
+
+function stagePoint(event) {
+  const stage = $("stage").getBoundingClientRect();
+  return [event.clientX - stage.left, event.clientY - stage.top];
+}
+
+async function rotate(delta) {
+  const p = current();
+  const rotation = (((p.rotation || 0) + delta) % 360 + 360) % 360;
+  try {
+    const updated = await api("PATCH", `/api/passcodes/${p.id}`, { rotation });
+    viewer.list[viewer.index] = updated;
+    showPasscode();
+    refresh(true);
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+async function toggleVerified() {
+  const p = current();
+  try {
+    viewer.list[viewer.index] = await api("PATCH", `/api/passcodes/${p.id}`, { verified: !p.verified });
+    showPasscode();
+    refresh(true);
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+function step(delta) {
+  const index = viewer.index + delta;
+  if (index < 0 || index >= viewer.list.length) return;
+  viewer.index = index;
+  viewer.view = "label_img";
+  showPasscode();
+}
+
+function row(p) {
+  const classes = ["row"];
+  if (p.verified) classes.push("verified");
+  else if (p.needs_review) classes.push("review");
+  const thumb = p.label_img
+    ? el("img", { className: "thumb", src: imageURL(p.label_img, p.rotation), alt: p.display_code, loading: "lazy", onclick: () => openViewer(p) })
+    : el("div", { className: "thumb" });
+
+  const info = el("div", {}, codeNode(p.display_code, p.uncertain_positions));
+  const meta = el("div", { className: "meta" },
+    el("span", { textContent: `#${p.id}` }),
+    el("span", { textContent: `group ${p.group_id}` }),
+    el("span", { textContent: `seen ×${p.seen_count}` }),
+    el("span", { textContent: `first ${new Date(p.first_seen).toLocaleString()}` }),
+  );
+  if (p.verified) meta.append(el("span", { textContent: "✓ verified" }));
+  else if (p.needs_review) meta.append(el("span", { textContent: "⚠ needs review" }));
+  const ai = aiTag(p);
+  if (ai) meta.append(ai);
+  if (p.note) meta.append(el("span", { textContent: `note: ${p.note}` }));
+  info.append(meta);
+  if (p.variants.length > 1) {
+    info.append(el("div", { className: "variants", textContent: "readings: " + p.variants.map((v) => `${v.code} ×${v.count}`).join(" · ") }));
+  }
+
+  const verify = el("button", { className: p.verified ? "" : "primary", textContent: p.verified ? "Unverify" : "Verify ✓" });
+  verify.onclick = () => mutate(() => api("PATCH", `/api/passcodes/${p.id}`, { verified: !p.verified }));
+  const edit = el("button", { textContent: "Edit" });
+  edit.onclick = () => {
+    const value = prompt("Correct passcode (16 characters):", p.display_code);
+    if (value !== null && value.trim() !== p.display_code) {
+      mutate(() => api("PATCH", `/api/passcodes/${p.id}`, { display_code: value, verified: true }));
+    }
+  };
+  const note = el("button", { textContent: "Note" });
+  note.onclick = () => {
+    const value = prompt("Note:", p.note);
+    if (value !== null) mutate(() => api("PATCH", `/api/passcodes/${p.id}`, { note: value }));
+  };
+  const copy = el("button", { textContent: "Copy", onclick: () => copyText(p.display_code) });
+  const turn = el("button", { textContent: "⟳ Rotate", title: "Turn the photos a quarter turn clockwise" });
+  turn.onclick = () => mutate(() => api("PATCH", `/api/passcodes/${p.id}`, { rotation: ((p.rotation || 0) + 90) % 360 }));
+  const remove = el("button", { className: "danger", textContent: "Delete" });
+  remove.onclick = () => {
+    if (confirm(`Delete ${p.display_code} and its photos? Use this only for a false scan.`)) {
+      mutate(() => api("DELETE", `/api/passcodes/${p.id}`));
+    }
+  };
+  return el("div", { className: classes.join(" ") }, thumb, info, el("div", { className: "actions" }, verify, edit, note, turn, copy, remove));
+}
+
+function aiTag(p) {
+  const text = {
+    confirmed: "AI ✓ same reading",
+    corrected: `AI corrected (was ${p.variants.map((v) => v.code).filter((c) => c !== p.display_code).join(", ") || "?"})`,
+    mismatch: `AI read ${p.ai_read}: compare with the photo`,
+    unreadable: "AI could not read it",
+    error: `AI check failed: ${p.ai_read}`,
+  }[p.ai_status];
+  return text ? el("span", { className: `ai-tag ${p.ai_status}`, textContent: text }) : null;
+}
+
+let lastRemovedCount = -1;
+
+function renderAI(stats) {
+  const ai = stats.ai;
+  const removedCount = Object.values(ai.removed).reduce((a, b) => a + b, 0);
+  const counts = ai.statuses;
+  const parts = [];
+  if (stats.ai_backlog) parts.push(`checking… ${stats.ai_backlog} left`);
+  for (const [status, label] of [["confirmed", "same"], ["corrected", "corrected"], ["mismatch", "differs"], ["unreadable", "unreadable"], ["error", "failed"]]) {
+    if (counts[status]) parts.push(`${counts[status]} ${label}`);
+  }
+  if (removedCount) parts.push(`${removedCount} removed`);
+  $("ai-status").textContent = stats.ai_enabled
+    ? `AI (${stats.ai_model}): ${parts.join(" · ") || "not run yet"}`
+    : "AI check off: start the server with OPENAI_API_KEY";
+  $("ai-low").textContent = `AI check low-confidence (${ai.unchecked_low_confidence})`;
+  $("ai-all").textContent = `AI check all (${ai.unchecked})`;
+  $("ai-low").disabled = !stats.ai_enabled || ai.unchecked_low_confidence === 0 || stats.ai_backlog > 0;
+  $("ai-all").disabled = !stats.ai_enabled || ai.unchecked === 0 || stats.ai_backlog > 0;
+  if (removedCount !== lastRemovedCount) {
+    lastRemovedCount = removedCount;
+    renderRemoved(removedCount);
+  }
+}
+
+async function renderRemoved(count) {
+  $("removed-box").hidden = count === 0;
+  if (count === 0) return;
+  $("removed-summary").textContent = `Removed by the AI check (${count}): sleeve text and misreads merged into their card`;
+  try {
+    const rows = await api("GET", "/api/removed");
+    $("removed-list").replaceChildren(...rows.map((r) => el("div", { className: "removed-row" },
+      r.label_img ? el("img", { src: imageURL(r.label_img, 0), alt: r.display_code, loading: "lazy", onclick: () => window.open(imageURL(r.label_img, 0)) }) : el("span"),
+      el("div", {},
+        el("div", { className: "code", textContent: r.display_code }),
+        el("div", { className: "meta", textContent: r.merged_into
+          ? `misread of #${r.merged_into} (AI read ${r.ai_read}) · seen ×${r.seen_count}`
+          : `${r.reason} · seen ×${r.seen_count}` })))));
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+async function startAICheck(scope) {
+  try {
+    const result = await api("POST", `/api/ai-check?scope=${scope}`);
+    toast(`AI check started for ${result.queued} passcodes`);
+    await refresh(true);
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+$("ai-low").onclick = () => startAICheck("low_confidence");
+$("ai-all").onclick = () => {
+  if (confirm("Ask the AI to read every unchecked passcode? This sends all their label photos to OpenAI.")) startAICheck("all");
+};
+
+async function mutate(action) {
+  try {
+    await action();
+    await refresh(true);
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+async function refresh(force = false) {
+  const params = new URLSearchParams();
+  const q = $("search").value.trim();
+  if (q) params.set("q", q);
+  const filter = $("filter").value;
+  if (filter) params.set(filter, "true");
+  const group = $("group-filter").value;
+  if (group) params.set("group", group);
+  try {
+    const [stats, list, groups] = await Promise.all([
+      api("GET", "/api/stats"), api("GET", `/api/passcodes?${params}`), api("GET", "/api/groups"),
+    ]);
+    renderGroups(groups);
+    $("unique").textContent = stats.unique_total;
+    $("target").textContent = stats.target_total;
+    $("progress").style.width = `${Math.min(100, (100 * stats.unique_total) / stats.target_total)}%`;
+    $("verified-chip").textContent = `${stats.verified} verified`;
+    $("review-chip").textContent = `${stats.needs_review} to review`;
+    $("sightings-chip").textContent = `${stats.total_sightings} scans`;
+    renderAI(stats);
+    const payload = JSON.stringify(list);
+    if (!force && payload === lastPayload) return;
+    lastPayload = payload;
+    currentList = list;
+    const container = $("list");
+    container.replaceChildren(...(list.length ? list.map(row) : [el("p", { className: "empty", textContent: "No passcodes yet. Start scanning with the iPhone." })]));
+  } catch (error) {
+    toast(`Server unreachable: ${error.message}`);
+  }
+}
+
+let groupInfo = null;
+
+function groupText(g, size) {
+  if (g.status === "over") return `${g.count}/${size} · ${g.count - size} extra`;
+  if (g.status === "short") return `${g.count}/${size} · ${size - g.count} missing`;
+  if (g.status === "full") return `${g.count}/${size} ✓`;
+  return `${g.count}/${size} · scanning`;
+}
+
+function renderGroups(info) {
+  groupInfo = info;
+  const current = info.groups[info.groups.length - 1];
+  $("group-current").textContent = `Group ${current.id}: ${current.count}/${info.size}`;
+  const select = $("group-filter");
+  const selected = select.value;
+  select.replaceChildren(el("option", { value: "", textContent: "All groups" }),
+    ...info.groups.map((g) => el("option", { value: String(g.id), textContent: `Group ${g.id} (${groupText(g, info.size)})` })));
+  select.value = info.groups.some((g) => String(g.id) === selected) ? selected : "";
+  $("groups").replaceChildren(...info.groups.map((g) => {
+    const chip = el("button", {
+      className: `${g.status}${String(g.id) === select.value ? " selected" : ""}`,
+      textContent: `G${g.id} ${groupText(g, info.size)}`,
+      title: g.status === "over" ? "More passcodes than cards in the stack: some are misreads to delete"
+        : g.status === "short" ? "Fewer passcodes than cards in the stack: some cards were not scanned" : "",
+    });
+    chip.onclick = () => {
+      select.value = select.value === String(g.id) ? "" : String(g.id);
+      refresh(true);
+    };
+    return chip;
+  }));
+}
+
+$("next-group").onclick = () => {
+  const current = groupInfo && groupInfo.groups[groupInfo.groups.length - 1];
+  if (current && current.count < groupInfo.size &&
+      !confirm(`Group ${current.id} has ${current.count} of ${groupInfo.size} passcodes. Start the next group anyway?`)) return;
+  mutate(async () => {
+    const group = await api("POST", "/api/groups/next");
+    toast(group.id === current?.id ? `Group ${group.id} is still empty` : `Started group ${group.id}`);
+  });
+};
+
+function scheduleRefresh() {
+  clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(() => refresh(true), 250);
+}
+
+$("search").addEventListener("input", scheduleRefresh);
+$("filter").addEventListener("change", scheduleRefresh);
+$("group-filter").addEventListener("change", scheduleRefresh);
+$("viewer-close").onclick = () => $("viewer").close();
+$("rotate-left").onclick = () => rotate(-90);
+$("rotate-right").onclick = () => rotate(90);
+$("zoom-in").onclick = () => zoomCentre(1.5);
+$("zoom-out").onclick = () => zoomCentre(1 / 1.5);
+$("zoom-fit").onclick = fitImage;
+$("viewer-prev").onclick = () => step(-1);
+$("viewer-next").onclick = () => step(1);
+$("viewer-verify").onclick = toggleVerified;
+window.addEventListener("resize", () => { if ($("viewer").open) fitImage(); });
+
+const stage = $("stage");
+stage.addEventListener("wheel", (event) => {
+  event.preventDefault();
+  zoomAt(Math.exp(-event.deltaY * (event.ctrlKey ? 0.01 : 0.0015)), ...stagePoint(event));
+}, { passive: false });
+stage.addEventListener("dblclick", (event) => {
+  if (viewer.scale > viewer.fit * 1.5) fitImage();
+  else zoomAt((viewer.fit * 3) / viewer.scale, ...stagePoint(event));
+});
+stage.addEventListener("pointerdown", (event) => {
+  stage.setPointerCapture(event.pointerId);
+  viewer.pointers.set(event.pointerId, stagePoint(event));
+  stage.classList.add("dragging");
+});
+stage.addEventListener("pointermove", (event) => {
+  const previous = viewer.pointers.get(event.pointerId);
+  if (!previous) return;
+  const point = stagePoint(event);
+  viewer.pointers.set(event.pointerId, point);
+  if (viewer.pointers.size === 2) {
+    const [a, b] = [...viewer.pointers.values()];
+    const distance = Math.hypot(a[0] - b[0], a[1] - b[1]);
+    const middle = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    if (viewer.pinch) {
+      viewer.x += middle[0] - viewer.pinch.middle[0];
+      viewer.y += middle[1] - viewer.pinch.middle[1];
+      zoomAt(distance / viewer.pinch.distance, ...middle);
+    }
+    viewer.pinch = { distance, middle };
+  } else if (viewer.pointers.size === 1) {
+    viewer.x += point[0] - previous[0];
+    viewer.y += point[1] - previous[1];
+    applyTransform();
+  }
+});
+function releasePointer(event) {
+  viewer.pointers.delete(event.pointerId);
+  viewer.pinch = null;
+  if (viewer.pointers.size === 0) stage.classList.remove("dragging");
+}
+stage.addEventListener("pointerup", releasePointer);
+stage.addEventListener("pointercancel", releasePointer);
+
+document.addEventListener("keydown", (event) => {
+  if (!$("viewer").open || event.metaKey || event.ctrlKey || event.altKey) return;
+  const actions = {
+    r: () => rotate(90), R: () => rotate(-90), "+": () => zoomCentre(1.5), "=": () => zoomCentre(1.5),
+    "-": () => zoomCentre(1 / 1.5), "0": fitImage, ArrowLeft: () => step(-1), ArrowRight: () => step(1),
+    v: toggleVerified, V: toggleVerified,
+  };
+  const action = actions[event.key];
+  if (action) { event.preventDefault(); action(); }
+});
+refresh(true);
+setInterval(() => { if (!$("viewer").open) refresh(); }, 3000);
+</script>
+</body>
+</html>

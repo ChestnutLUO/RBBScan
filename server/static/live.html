@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>RBB Live</title>
+<style>
+  :root {
+    --bg: #0b0d11; --panel: #151922; --text: #f2f4f7; --muted: #8a94a6; --line: #262c38;
+    --good: #22c55e; --warn: #f59e0b; --bad: #ef4444; --idle: #64748b; --accent: #818cf8;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--text); font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    padding: max(12px, env(safe-area-inset-top)) 16px 16px; }
+  .grid { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; grid-template-areas: "count status" "latest preview" "recent preview"; max-width: 1400px; margin: 0 auto; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 16px; min-width: 0; }
+  .count { grid-area: count; display: flex; flex-direction: column; justify-content: center; }
+  .count .big { font-size: clamp(56px, 11vw, 120px); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+  .count .big small { font-size: .35em; color: var(--muted); font-weight: 600; }
+  .bar { height: 10px; background: var(--line); border-radius: 5px; overflow: hidden; margin-top: 12px; }
+  .bar > div { height: 100%; background: var(--accent); width: 0; transition: width .4s; }
+  .sub { color: var(--muted); margin-top: 8px; font-size: 14px; }
+  .group { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .group .label { font-size: clamp(22px, 3.6vw, 34px); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .group .label b { font-size: 1.25em; }
+  .group .note { font-size: 15px; color: var(--muted); flex-basis: 100%; }
+  .group.full .label b { color: var(--good); }
+  .group.over .label b, .group.over .note { color: var(--bad); }
+  .group button { margin-left: auto; font: 700 18px -apple-system, sans-serif; color: #fff; background: var(--accent);
+    border: 0; border-radius: 12px; padding: 10px 18px; cursor: pointer; }
+  .group.full button { background: var(--good); color: #04130a; }
+  .status { grid-area: status; display: flex; flex-direction: column; gap: 10px; justify-content: center; }
+  .pill { align-self: flex-start; display: inline-flex; align-items: center; gap: 10px; font-size: clamp(20px, 3.4vw, 32px); font-weight: 700;
+    padding: 8px 20px; border-radius: 999px; background: var(--idle); color: #fff; }
+  .pill::before { content: ""; width: .6em; height: .6em; border-radius: 50%; background: currentColor; }
+  .pill.good { background: var(--good); } .pill.warn { background: var(--warn); color: #111; } .pill.bad { background: var(--bad); }
+  .pill.good::before { animation: pulse 1.2s infinite; }
+  @keyframes pulse { 50% { opacity: .3; } }
+  .facts { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); font-size: 15px; }
+  .tracking { font: 15px ui-monospace, Menlo, monospace; color: var(--warn); min-height: 1.4em; }
+  .latest { grid-area: latest; }
+  .latest .tag { display: inline-block; font-size: clamp(22px, 4vw, 40px); font-weight: 800; padding: 2px 16px; border-radius: 10px; }
+  .tag.new { background: var(--good); color: #04130a; }
+  .tag.dup { background: var(--warn); color: #1a1100; }
+  .latest .code { font: 700 clamp(26px, 3.8vw, 60px)/1.15 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: 1px; margin: 12px 0; word-break: break-all; }
+  .code .unc { color: var(--bad); text-decoration: underline wavy; }
+  .latest img { width: 100%; max-height: 180px; object-fit: contain; background: #000; border-radius: 10px; }
+  .latest .flash { animation: flash .9s ease-out; }
+  @keyframes flash { from { background: rgba(34,197,94,.45); } to { background: transparent; } }
+  .preview { grid-area: preview; display: flex; flex-direction: column; gap: 8px; }
+  .preview img { width: 100%; flex: 1; min-height: 200px; max-height: 70vh; object-fit: contain; background: #000; border-radius: 10px; }
+  .preview .none { flex: 1; display: grid; place-items: center; color: var(--muted); min-height: 200px; background: #000; border-radius: 10px; }
+  .recent { grid-area: recent; }
+  .recent ol { list-style: none; margin: 8px 0 0; padding: 0; }
+  .recent li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-top: 1px solid var(--line);
+    font: 17px ui-monospace, Menlo, monospace; }
+  .recent li .n { color: var(--muted); font-family: -apple-system, sans-serif; font-size: 14px; white-space: nowrap; }
+  .recent li.dup { color: var(--warn); }
+  h2 { margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  #sound { position: fixed; inset: 0; background: rgba(0,0,0,.82); display: grid; place-items: center; z-index: 5; border: 0; color: #fff;
+    font: 700 28px -apple-system, sans-serif; cursor: pointer; width: 100%; padding: 24px; text-align: center; }
+  #sound small { display: block; font-size: 16px; font-weight: 400; color: var(--muted); margin-top: 8px; }
+  @media (max-width: 760px) {
+    .latest .code { font-size: clamp(22px, 7vw, 40px); }
+    .grid { grid-template-columns: 1fr; grid-template-areas: "count" "status" "latest" "preview" "recent"; }
+  }
+</style>
+</head>
+<body>
+<button id="sound"><span>Tap to start the live view with sound<small>Browsers only play audio after a tap.</small></span></button>
+<div class="grid">
+  <section class="panel count">
+    <h2>Unique passcodes</h2>
+    <div class="big"><span id="unique">0</span><small> / <span id="target">1050</span></small></div>
+    <div class="bar"><div id="progress"></div></div>
+    <div class="sub" id="substats">–</div>
+    <div class="group" id="group">
+      <span class="label" id="group-label">Group –</span>
+      <button id="next-group">Next group ▸</button>
+      <span class="note" id="group-note"></span>
+    </div>
+  </section>
+  <section class="panel status">
+    <h2>Scanner</h2>
+    <div class="pill" id="pill">Connecting…</div>
+    <div class="facts" id="facts"></div>
+    <div class="tracking" id="tracking"></div>
+  </section>
+  <section class="panel latest" id="latest-panel">
+    <h2>Latest scan</h2>
+    <div id="latest"><p class="sub">Nothing scanned yet.</p></div>
+  </section>
+  <section class="panel preview">
+    <h2>Camera</h2>
+    <img id="preview" alt="Live camera preview" hidden>
+    <div class="none" id="no-preview">No preview yet</div>
+  </section>
+  <section class="panel recent">
+    <h2>Last 10</h2>
+    <ol id="recent"></ol>
+  </section>
+</div>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+let audio = null;
+let recent = [];
+let lastStatusAt = 0;
+let connected = false;
+let scanner = null;
+let shownPreviewSeq = -1;
+
+function el(tag, props = {}, ...children) {
+  const node = document.createElement(tag);
+  Object.assign(node, props);
+  for (const child of children) node.append(child);
+  return node;
+}
+
+function tone(frequency, start, duration, volume = 0.25) {
+  const osc = audio.createOscillator();
+  const gain = audio.createGain();
+  osc.type = "sine";
+  osc.frequency.value = frequency;
+  gain.gain.setValueAtTime(0, audio.currentTime + start);
+  gain.gain.linearRampToValueAtTime(volume, audio.currentTime + start + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + start + duration);
+  osc.connect(gain).connect(audio.destination);
+  osc.start(audio.currentTime + start);
+  osc.stop(audio.currentTime + start + duration + 0.02);
+}
+
+/** Rising arpeggio when a stack's group is complete; a low double buzz when it overflows. */
+function groupSound(kind) {
+  if (!audio) return;
+  if (kind === "full") { tone(1047, 0.35, 0.15); tone(1319, 0.5, 0.15); tone(1568, 0.65, 0.3); }
+  else { tone(220, 0.35, 0.2, 0.3); tone(220, 0.62, 0.2, 0.3); }
+}
+
+function beep(isNew) {
+  if (!audio) return;
+  if (isNew) { tone(1320, 0, 0.12); tone(1760, 0.14, 0.16); }
+  else { tone(440, 0, 0.18, 0.15); }
+}
+
+async function keepAwake() {
+  try {
+    if ("wakeLock" in navigator) await navigator.wakeLock.request("screen");
+  } catch (_) {
+    // Wake Lock needs HTTPS; over plain HTTP set the device's Auto-Lock to Never instead.
+  }
+}
+
+$("sound").onclick = () => {
+  $("sound").hidden = true;
+  try {
+    audio = new (window.AudioContext || window.webkitAudioContext)();
+    audio.resume().then(() => tone(880, 0, 0.08, 0.1), () => { audio = null; });
+  } catch (_) {
+    audio = null;
+  }
+  keepAwake();
+};
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") keepAwake(); });
+
+function codeNode(code, uncertain) {
+  const wrap = el("div", { className: "code" });
+  const unsure = new Set(uncertain || []);
+  [...code].forEach((ch, i) => wrap.append(el("span", { className: unsure.has(i) ? "unc" : "", textContent: ch })));
+  return wrap;
+}
+
+let shownGroup = null;
+
+function renderGroup(group) {
+  if (!group) return;
+  const status = group.count > group.size ? "over" : group.count === group.size ? "full" : "open";
+  $("group").className = `group ${status}`;
+  $("group-label").replaceChildren(`Group ${group.id} · `, el("b", { textContent: group.count }), ` / ${group.size}`);
+  $("group-note").textContent = status === "full" ? "Stack complete. Put the next stack down and press Next group."
+    : status === "over" ? `${group.count - group.size} more than the stack: misreads to fix later on the review page.`
+    : `${group.size - group.count} cards to go in this stack.`;
+  if (shownGroup && shownGroup.id === group.id && group.count > shownGroup.count) {
+    if (group.count === group.size) groupSound("full");
+    else if (group.count > group.size && shownGroup.count <= group.size) groupSound("over");
+  }
+  shownGroup = group;
+}
+
+$("next-group").onclick = async () => {
+  const group = shownGroup;
+  if (group && group.count < group.size &&
+      !confirm(`Group ${group.id} has ${group.count} of ${group.size} passcodes. Start the next group anyway?`)) return;
+  try {
+    const response = await fetch("/api/groups/next", { method: "POST" });
+    if (!response.ok) throw new Error(response.statusText);
+    renderGroup(await response.json());
+  } catch (error) {
+    alert(`Could not start the next group: ${error.message}`);
+  }
+};
+
+function renderStats(stats) {
+  renderGroup(stats.group);
+  $("unique").textContent = stats.unique_total;
+  $("target").textContent = stats.target_total;
+  $("progress").style.width = `${Math.min(100, (100 * stats.unique_total) / stats.target_total)}%`;
+  const remaining = Math.max(0, stats.target_total - stats.unique_total);
+  $("substats").textContent = `${remaining} to go · ${stats.total_sightings} scans · ${stats.needs_review} to review`;
+}
+
+function imageURL(name, rotation) {
+  return rotation ? `/images/${name}?rotate=${rotation}` : `/images/${name}`;
+}
+
+function renderLatest(scan) {
+  const box = $("latest");
+  const isNew = scan.is_new;
+  const tag = el("span", { className: `tag ${isNew ? "new" : "dup"}`, textContent: isNew ? "NEW" : `DUPLICATE · seen ×${scan.seen_count}` });
+  const parts = [tag, codeNode(scan.display_code, scan.uncertain_positions)];
+  if (scan.uncertain_positions && scan.uncertain_positions.length) {
+    parts.push(el("p", { className: "sub", textContent: "Red characters were unclear. Check them on the review page." }));
+  }
+  if (scan.label_img) parts.push(el("img", { src: imageURL(scan.label_img, scan.rotation), alt: scan.display_code }));
+  box.replaceChildren(...parts);
+  const panel = $("latest-panel");
+  panel.classList.remove("flash");
+  void panel.offsetWidth;
+  if (isNew) panel.classList.add("flash");
+}
+
+function renderRecent() {
+  $("recent").replaceChildren(...recent.map((s) =>
+    el("li", { className: s.was_new ? "" : "dup" },
+      el("span", { textContent: s.display_code }),
+      el("span", { className: "n", textContent: s.was_new ? "new" : `seen ×${s.seen_count}` }))));
+}
+
+function renderScanner() {
+  const pill = $("pill");
+  const facts = $("facts");
+  const fresh = Date.now() - lastStatusAt < 5000;
+  let cls = "bad", text = "Scanner offline";
+  if (!connected) {
+    text = "Server disconnected";
+  } else if (scanner && scanner.online && fresh) {
+    const reading = (scanner.tracking || []).some((t) => !t.confirmed);
+    if (scanner.paused || !scanner.camera_running) { cls = ""; text = "Paused"; }
+    else if (scanner.pending_uploads > 0) { cls = "bad"; text = `${scanner.pending_uploads} upload(s) pending`; }
+    else if (reading) { cls = "warn"; text = "Reading…"; }
+    else { cls = "good"; text = "Scanning"; }
+  }
+  pill.className = `pill ${cls}`;
+  pill.textContent = text;
+
+  const items = [];
+  if (scanner && scanner.device) items.push(scanner.device);
+  if (scanner && scanner.battery >= 0) items.push(`battery ${Math.round(scanner.battery * 100)}%`);
+  if (scanner && scanner.torch) items.push("torch on");
+  if (scanner && scanner.age_seconds != null && !scanner.online) items.push(`last seen ${Math.round(scanner.age_seconds)}s ago`);
+  facts.replaceChildren(...items.map((t) => el("span", { textContent: t })));
+  const tracking = (scanner && scanner.online && scanner.tracking) || [];
+  $("tracking").textContent = tracking.filter((t) => !t.confirmed).map((t) => `${t.best_read} (${t.read_count})`).join("   ");
+
+  if (scanner && scanner.preview_seq > 0 && scanner.preview_seq !== shownPreviewSeq && scanner.online) {
+    shownPreviewSeq = scanner.preview_seq;
+    const img = $("preview");
+    img.src = `/api/latest-preview.jpg?seq=${scanner.preview_seq}`;
+    img.hidden = false;
+    $("no-preview").hidden = true;
+  }
+}
+
+function connect() {
+  const source = new EventSource("/api/events");
+  source.addEventListener("open", () => { connected = true; renderScanner(); });
+  source.addEventListener("error", () => { connected = false; renderScanner(); });
+  source.addEventListener("hello", (event) => {
+    const data = JSON.parse(event.data);
+    connected = true;
+    renderStats(data.stats);
+    scanner = data.scanner;
+    lastStatusAt = Date.now();
+    recent = data.recent;
+    renderRecent();
+    if (recent.length) renderLatest({ ...recent[0], is_new: recent[0].was_new });
+    renderScanner();
+  });
+  source.addEventListener("status", (event) => {
+    scanner = JSON.parse(event.data);
+    lastStatusAt = Date.now();
+    renderScanner();
+  });
+  source.addEventListener("stats", (event) => renderStats(JSON.parse(event.data)));
+  source.addEventListener("scan", (event) => {
+    const data = JSON.parse(event.data);
+    const p = data.passcode;
+    renderStats(data.stats);
+    const scan = {
+      display_code: p.display_code, seen_count: data.seen_count, is_new: data.is_new, was_new: data.is_new,
+      uncertain_positions: p.uncertain_positions, label_img: p.label_img, rotation: p.rotation,
+    };
+    renderLatest(scan);
+    recent = [scan, ...recent].slice(0, 10);
+    renderRecent();
+    beep(data.is_new);
+  });
+}
+
+connect();
+setInterval(renderScanner, 1000);
+</script>
+</body>
+</html>

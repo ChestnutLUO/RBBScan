@@ -1,0 +1,8 @@
+// Signing defaults for a fresh clone. Put your own values in Local.xcconfig next to this file
+// (it is git-ignored), for example:
+//   DEVELOPMENT_TEAM = ABCDE12345
+//   RBB_BUNDLE_ID_PREFIX = com.yourname
+DEVELOPMENT_TEAM =
+RBB_BUNDLE_ID_PREFIX = com.example
+
+#include? "Local.xcconfig"

@@ -1,0 +1,66 @@
+name: RBBScan
+options:
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+packages:
+  PasscodeCore:
+    path: ../PasscodeCore
+configFiles:
+  Debug: Config/Signing.xcconfig
+  Release: Config/Signing.xcconfig
+settings:
+  base:
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  RBBScan:
+    type: application
+    platform: iOS
+    sources: [RBBScan]
+    dependencies:
+      - package: PasscodeCore
+    info:
+      path: RBBScan/Info.plist
+      properties:
+        CFBundleDisplayName: RBB Scan
+        UILaunchScreen: {}
+        UIRequiresFullScreen: true
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSCameraUsageDescription: RBB Scan reads the passcodes printed on your Battle Beacon cards.
+        NSLocalNetworkUsageDescription: RBB Scan sends scanned passcodes to your Mac over Tailscale.
+        NSAppTransportSecurity:
+          # The server is a plain-HTTP address on the tailnet, which WireGuard already encrypts,
+          # and its address is user-configurable, so no fixed exception domain can be listed.
+          # NSAllowsLocalNetworking must stay absent: when present, iOS ignores
+          # NSAllowsArbitraryLoads, and it does not cover Tailscale's 100.x addresses.
+          NSAllowsArbitraryLoads: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(RBB_BUNDLE_ID_PREFIX).rbbscan
+        TARGETED_DEVICE_FAMILY: "1"
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+  RBBScanTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      # The tests use real passcodes, so they are kept out of git and exist only locally.
+      - path: RBBScanTests
+        optional: true
+    dependencies:
+      - target: RBBScan
+      - package: PasscodeCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(RBB_BUNDLE_ID_PREFIX).rbbscan.tests
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  RBBScan:
+    build:
+      targets:
+        RBBScan: all
+        RBBScanTests: [test]
+    test:
+      targets: [RBBScanTests]
