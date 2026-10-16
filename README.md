@@ -11,6 +11,13 @@ Mac mini server (FastAPI + SQLite), on its Tailscale address, port 8787
    └─ /live   second-device dashboard: counter, NEW/DUPLICATE, camera preview, beeps
 ```
 
+> **Built for RARE Battle Beacon cards only.** Recognition is tuned to these cards: 16 characters of `A–Z 0–9`, dark on a white strip, beside the Battle Beacon description text. Passcodes from other Ingress cards, promotions or events may have a different length, character set or layout, and this app will skip them or misread them. To adapt it, change:
+>
+> * the format rules in `PasscodeCore/Sources/PasscodeCore/Passcode.swift` and `server/rbbscan/passcode.py`; keep the two in step;
+> * the printed card text in `CardTextFilter.swift`;
+> * the light-label check in `LabelFilter.swift`;
+> * the AI check's instructions in `server/rbbscan/verifier.py`.
+
 ## How a passcode is recognised
 
 * A passcode is **16 characters of `A–Z 0–9`**, printed dark on a white strip.
